@@ -89,7 +89,9 @@ def main():
                     help="File name with URLS to test, Currently not available")
 
     (options, args) = parser.parse_args()
-    
+    if len(args) == 0:
+        parser.error("Please supply an argument")
+
     garmr = Garmr(options.aut)
     garmr.trace_checks()
     garmr.xframe_checks()
