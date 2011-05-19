@@ -81,7 +81,7 @@ class Garmr(object):
 
 def main():
     usage = "Usage: %prog [option] arg"
-    parser = OptionParser(usage=usage)
+    parser = OptionParser(usage=usage, version="%prog 0.1")
     parser.add_option("-u", "--url", action="store", type="string",
                     dest="aut", help="Url to be tested")
     parser.add_option("-f", "--file", action="store", type="string",
