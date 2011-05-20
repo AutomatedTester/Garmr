@@ -3,6 +3,12 @@
 import httplib
 import urllib2
 from optparse import OptionParser
+import logging
+
+
+logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s')
+logger = logging.getLogger("Garmr")
+logger.setLevel(logging.DEBUG)
 
 class Reporter(object):
     pass
@@ -18,23 +24,21 @@ class Garmr(object):
             response = urllib2.urlopen(self.urls) 
             response_headers = response.headers.headers
             headers = self._clean_header(response_headers)
-            print "Checking x-frame-options"
+            logger.info("Checking x-frame-options")
             try:
                 assert headers["x-frame-options"] == "DENY" or \
             	    headers["x-frame-options"] == "SAMEORIGIN", \
                 	"x-frame-options were: %s" % headers["x-frame-options"]
 
-                print "x-frame-options were correct"
+                logger.info("x-frame-options were correct")
             except KeyError:
-                print "x-frame-options were not found in headers"
+                logger.error("x-frame-options were not found in headers")
         except AssertionError, e:
-            print str(e)
-        finally:
-            print "\n"
+            logger.error(str(e))
         
     def trace_checks(self):
     	try:
-            print "Checking TRACE is not valid"
+            logger.info("Checking TRACE is not valid")
             http_urls = self._clean_url(self.urls) 
             request = httplib.HTTPConnection(http_urls[0])
             if len(http_urls) > 1:
@@ -45,23 +49,19 @@ class Garmr(object):
             request.getresponse()
             raise Exception("TRACE is a valid HTTP call")
         except httplib.BadStatusLine, e:
-            print "TRACE is not valid"
+            logger.error("TRACE is not valid")
         except Exception, e:
-            print str(e)
-        finally:
-            print "\n"
+            logger.error(str(e))
 
 
     def redirect_checks(self):
         response = urllib2.urlopen(self.urls)
         try:
-            print "Checking for HTTPS"
+            logger.info("Checking for HTTPS")
             assert "https://" in response.geturl(), "Have not been redirected to HTTPS"
-            print "Redirected to HTTPS version of site"
+            logger.info("Redirected to HTTPS version of site")
         except AssertionError, e:
-            print str(e)
-        finally:
-            print "\n"
+            logger.error(str(e))
 
         
     def _clean_header(self, response_headers):
@@ -89,7 +89,7 @@ def main():
                     help="File name with URLS to test, Currently not available")
 
     (options, args) = parser.parse_args()
-    if len(args) == 0:
+    if not options:
         parser.error("Please supply an argument")
 
     garmr = Garmr(options.aut)
