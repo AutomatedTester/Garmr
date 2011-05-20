@@ -3,13 +3,13 @@ import sys
 from setuptools import setup, find_packages
 def main():
     setup(name='Garmr',
-          version='0.1a',
+          version='0.1',
           description='A tool for testing a web application for basic security holes',
           author='David Burns',
           author_email='dburns at mozilladotcom',
           entry_points= make_entry_points(),
           url='https://github.com/AutomatedTester/Garmr',
-          classifiers=['Development Status :: 2 - Pre-Alpha',
+          classifiers=['Development Status :: 3 - Alpha',
                      'Intended Audience :: Developers',
                      'License :: OSI Approved :: Mozilla Public License 1.1 (MPL 1.1)',
                      'Operating System :: POSIX',
