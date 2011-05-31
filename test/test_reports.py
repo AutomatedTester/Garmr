@@ -24,7 +24,7 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s">""" % \
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
         assert result["time_taken"] == 1
         assert result["errors"] == 0
@@ -41,9 +41,9 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        expected = """<testcase classname="" name="%s" time="%s">""" % \
+        expected = """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
-        expected += """<testcase classname="" name="%s" time="%s">""" % \
+        expected += """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[1]["name"], tests_list[1]["time_taken"]) 
         assert result["testcase"] == expected, result["testcase"]
         assert result["time_taken"] == 2
@@ -64,9 +64,9 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        expected = """<testcase classname="" name="%s" time="%s">""" % \
+        expected = """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
-        expected += """<testcase classname="" name="%s" time="%s">""" % \
+        expected += """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[1]["name"], tests_list[1]["time_taken"]) 
         assert result["testcase"] == expected, result["testcase"]
         assert result["time_taken"] == 2
@@ -82,7 +82,7 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s">""" % \
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
         assert result["time_taken"] == 1
         assert result["errors"] == 0
@@ -97,7 +97,7 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s">""" % \
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
         assert result["time_taken"] == 1
         assert result["errors"] == 1
@@ -112,7 +112,7 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s">""" % \
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
         assert result["time_taken"] == 1
         assert result["errors"] == 0
@@ -129,7 +129,7 @@ class TestReports:
             skips="{skips}" tests="{numtests}" time="{timetaken}">
             {testresults}
         </testsuite>"""
-        testcase = """<testcase classname="" name="%s" time="%s">""" % \
+        testcase = """<testcase classname="" name="%s" time="%s"/>""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
 
         expected = suite_xml.format(error=0, failure=0, skips=0, numtests=len(tests_list), 

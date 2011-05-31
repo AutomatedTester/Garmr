@@ -67,7 +67,7 @@ class Reporter(object):
 
 
     def _format_results(self):
-        testcase = """<testcase classname="" name="{testname}" time="{timetaken}">"""
+        testcase = """<testcase classname="" name="{testname}" time="{timetaken}"/>"""
         formatted_results = ""
         results = {"time_taken":0,
                     "errors" : 0,
@@ -98,6 +98,7 @@ class Garmr(object):
 
     def xframe_checks(self):
         result = {}
+        result["name"] = self.xframe_checks.__name__
         start = datetime.now()
         try:
             response = urllib2.urlopen(self.urls) 
@@ -111,15 +112,19 @@ class Garmr(object):
 
                 logger.info("x-frame-options were correct")
             except KeyError:
-                logger.error("x-frame-options were not found in headers")
-        except AssertionError, e:
+                result["failed"] = True
+                logger.critical("x-frame-options were not found in headers")
+        except AssertionError as e:
             logger.error(str(e))
+            result["errors"] = True
         finish = datetime.now()
         result["time_taken"] = self._total_seconds(start, finish)
         logger.debug("Time Taken: %s:" % result["time_taken"])
+        return result
         
     def trace_checks(self):
         result = {}
+        result["name"] = self.trace_checks.__name__
         start = datetime.now()
     	try:
             logger.info("Checking TRACE is not valid")
@@ -133,16 +138,19 @@ class Garmr(object):
             request.getresponse()
             raise Exception("TRACE is a valid HTTP call")
         except httplib.BadStatusLine, e:
-            logger.error("TRACE is not valid")
+            logger.info("TRACE is not valid")
         except Exception, e:
             logger.error(str(e))
+            result["errors"] = True
         finish = datetime.now()
         result["time_taken"] = self._total_seconds(start, finish)
         logger.debug("Time Taken: %s:" % result["time_taken"])
+        return result
 
 
     def redirect_checks(self):
         result = {}
+        result["name"] = self.redirect_checks.__name__
         start = datetime.now()
         response = urllib2.urlopen(self.urls)
         try:
@@ -151,9 +159,11 @@ class Garmr(object):
             logger.info("Redirected to HTTPS version of site")
         except AssertionError, e:
             logger.error(str(e))
+            result["errors"] = True
         finish = datetime.now()
         result["time_taken"] = self._total_seconds(start, finish)
         logger.debug("Time Taken: %s:" % result["time_taken"])
+        return result
 
     def _clean_header(self, response_headers):
     	headers = {}
@@ -172,7 +182,7 @@ class Garmr(object):
 
     def _total_seconds(self, start, finish):
         td = finish - start
-        return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
+        return float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
 
 def main():
     usage = "Usage: %prog [option] arg"
@@ -183,18 +193,21 @@ def main():
                     dest="file_name", 
                     help="File name with URLS to test, Currently not available")
     parser.add_option("-x", "--xunit", action="store", type="string",
-                    dest="xunit",
+                    dest="xunit", default='garmr-results.xml',
                     help="Name of file that you wish to write to")
 
     (options, args) = parser.parse_args()
     if options.aut is None and options.file_name is None:
         parser.error("Please supply an argument")
 
-    garmr = Garmr(options.aut)
-    garmr.trace_checks()
-    garmr.xframe_checks()
-    garmr.redirect_checks()
+    test_results = []
 
+    garmr = Garmr(options.aut)
+    test_results.append(garmr.trace_checks())
+    test_results.append(garmr.xframe_checks())
+    test_results.append(garmr.redirect_checks())
+    reporter = Reporter(test_results)
+    reporter.write_results(file_name=options.xunit)
 
 if __name__ == "__main__":
     main()
