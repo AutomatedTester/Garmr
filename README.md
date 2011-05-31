@@ -25,4 +25,4 @@ tests stored in it.
 ## Tasks
 
 If you want to see what is currently being worked on you can see it on the 
-(Pivotal Tracker)[https://www.pivotaltracker.com/projects/285905]
+[Pivotal Tracker](https://www.pivotaltracker.com/projects/285905)
