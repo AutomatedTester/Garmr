@@ -4,6 +4,7 @@ import httplib
 import urllib2
 from optparse import OptionParser
 import logging
+from datetime import datetime
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s')
@@ -91,10 +92,13 @@ class Reporter(object):
 
 class Garmr(object):
 
+
     def __init__(self, urls):
         self.urls = urls
 
     def xframe_checks(self):
+        result = {}
+        start = datetime.now()
         try:
             response = urllib2.urlopen(self.urls) 
             response_headers = response.headers.headers
@@ -110,8 +114,13 @@ class Garmr(object):
                 logger.error("x-frame-options were not found in headers")
         except AssertionError, e:
             logger.error(str(e))
+        finish = datetime.now()
+        result["time_taken"] = self._total_seconds(start, finish)
+        logger.debug("Time Taken: %s:" % result["time_taken"])
         
     def trace_checks(self):
+        result = {}
+        start = datetime.now()
     	try:
             logger.info("Checking TRACE is not valid")
             http_urls = self._clean_url(self.urls) 
@@ -127,9 +136,14 @@ class Garmr(object):
             logger.error("TRACE is not valid")
         except Exception, e:
             logger.error(str(e))
+        finish = datetime.now()
+        result["time_taken"] = self._total_seconds(start, finish)
+        logger.debug("Time Taken: %s:" % result["time_taken"])
 
 
     def redirect_checks(self):
+        result = {}
+        start = datetime.now()
         response = urllib2.urlopen(self.urls)
         try:
             logger.info("Checking for HTTPS")
@@ -137,8 +151,10 @@ class Garmr(object):
             logger.info("Redirected to HTTPS version of site")
         except AssertionError, e:
             logger.error(str(e))
+        finish = datetime.now()
+        result["time_taken"] = self._total_seconds(start, finish)
+        logger.debug("Time Taken: %s:" % result["time_taken"])
 
-        
     def _clean_header(self, response_headers):
     	headers = {}
     	for head in response_headers:
@@ -154,6 +170,10 @@ class Garmr(object):
             split.append(matches)
         return split
 
+    def _total_seconds(self, start, finish):
+        td = finish - start
+        return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
+
 def main():
     usage = "Usage: %prog [option] arg"
     parser = OptionParser(usage=usage, version="%prog 0.1")
@@ -167,7 +187,7 @@ def main():
                     help="Name of file that you wish to write to")
 
     (options, args) = parser.parse_args()
-    if options.aut is None or options.file_name is None:
+    if options.aut is None and options.file_name is None:
         parser.error("Please supply an argument")
 
     garmr = Garmr(options.aut)
