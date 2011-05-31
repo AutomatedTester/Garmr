@@ -167,7 +167,7 @@ def main():
                     help="Name of file that you wish to write to")
 
     (options, args) = parser.parse_args()
-    if not options:
+    if options.aut is None or options.file_name is None:
         parser.error("Please supply an argument")
 
     garmr = Garmr(options.aut)
