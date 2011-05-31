@@ -11,8 +11,68 @@ logger = logging.getLogger("Garmr")
 logger.setLevel(logging.DEBUG)
 
 class Reporter(object):
-    pass
+    """
+        This class formats and writes a xUnit style report on the results from
+        the basic tests
+    """
+    
+
+    suite_xml="""
+        <?xml version="1.0" encoding="utf-8"?>
+        <testsuite name="Garmr" errors="{error}" failures="{failure}" 
+            skips="{skips}" tests="{numtests}" time="{timetaken}">
+            {testresults}
+        </testsuite>
+    """
+
+    def __init__(self, results=None):
+        """
+            Initializes the reporter class
+            Args:
+                results - optional parameter to take the results. If results 
+                        are not passed in here they need to be passed in
+                        write_results method or an exception will be raised
+        """
+        logging.debug("Reporter class initialized")
+        self.results = results
+
+    def write_results(self, file_name='garmr-results.xml', results=None):
+        """
+            This writes the xml to disk.
+            Args:
+                file_name - optional parameter of the name of the file to create
+                results - optional parameter of with the test results. If this is
+                        empty and nothing was passed in during object initialization
+                        an error will be raised. 
+                        Note: if you pass in above and here the latest results will 
+                        be used
+
+        """
+        if self.results is None and results is None:
+            logging.exception("No test results have been passed Reporter")
+            raise Exception("No results have been passed. Please pass in a result")
+
+    def _format_results(self):
+        testcase = """<testcase classname="" name="{testname}" time="{timetaken}">"""
+        formatted_results = ""
+        results = {"time_taken":0,
+                    "errors" : 0,
+                    "failed" : 0,
+                    "skips" : 0}
         
+        for res in self.results:
+            formatted_results +=  testcase.format(
+                    testname = res["name"],timetaken=res["time_taken"])
+            if res.has_key("errors"):
+                results["errors"] += 1
+            if res.has_key("failed"):
+                results["failed"] += 1
+            if res.has_key("skips"):
+                results["skips"] += 1
+            results["time_taken"] += res["time_taken"]
+        
+        results["testcase"] = formatted_results
+        return results
 
 class Garmr(object):
 
