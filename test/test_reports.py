@@ -49,6 +49,7 @@ class TestReports:
         assert result["time_taken"] == 2
         assert result["errors"] == 0
         assert result["failed"] == 0
+        assert result["tests"] == 2
         assert result["skips"] == 0 
 
     def test_reporter_formats_2_test_cases_with_mix_of_errors_or_failures(self):
@@ -117,3 +118,27 @@ class TestReports:
         assert result["errors"] == 0
         assert result["failed"] == 0 
         assert result["skips"] == 1 
+
+    def test_that_reporter_writes_to_disk(self):
+        tests_list = []
+        tests_list.append({"name":"skipstest",
+                           "time_taken": 1,
+            })
+        suite_xml="""<?xml version="1.0" encoding="utf-8"?>
+        <testsuite name="Garmr" errors="{error}" failures="{failure}" 
+            skips="{skips}" tests="{numtests}" time="{timetaken}">
+            {testresults}
+        </testsuite>"""
+        testcase = """<testcase classname="" name="%s" time="%s">""" % \
+                        (tests_list[0]["name"], tests_list[0]["time_taken"])
+
+        expected = suite_xml.format(error=0, failure=0, skips=0, numtests=len(tests_list), 
+                timetaken=1, testresults=testcase)
+
+        reporter = Reporter(tests_list)
+        reporter.write_results()
+
+        f = open("garmr-results.xml", "r")
+        contents = f.read()
+        f.close()
+        assert expected == contents

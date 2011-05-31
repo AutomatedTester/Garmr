@@ -17,13 +17,11 @@ class Reporter(object):
     """
     
 
-    suite_xml="""
-        <?xml version="1.0" encoding="utf-8"?>
+    suite_xml="""<?xml version="1.0" encoding="utf-8"?>
         <testsuite name="Garmr" errors="{error}" failures="{failure}" 
             skips="{skips}" tests="{numtests}" time="{timetaken}">
             {testresults}
-        </testsuite>
-    """
+        </testsuite>"""
 
     def __init__(self, results=None):
         """
@@ -52,15 +50,32 @@ class Reporter(object):
             logging.exception("No test results have been passed Reporter")
             raise Exception("No results have been passed. Please pass in a result")
 
+        if results is not None:
+            self.results = results
+
+        formatted = self._format_results()
+        suite_results = self.suite_xml.format(error=formatted["errors"], 
+                                        failure=formatted["failed"],
+                                        skips=formatted["skips"],
+                                        numtests=formatted["tests"], 
+                                        timetaken=formatted["time_taken"], 
+                                        testresults=formatted["testcase"])
+        file_results = open(file_name, "w")
+        file_results.write(suite_results)
+        file_results.close()
+
+
     def _format_results(self):
         testcase = """<testcase classname="" name="{testname}" time="{timetaken}">"""
         formatted_results = ""
         results = {"time_taken":0,
                     "errors" : 0,
                     "failed" : 0,
-                    "skips" : 0}
+                    "skips" : 0,
+                    "tests" : 0}
         
         for res in self.results:
+            results["tests"] += 1
             formatted_results +=  testcase.format(
                     testname = res["name"],timetaken=res["time_taken"])
             if res.has_key("errors"):
