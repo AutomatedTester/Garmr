@@ -17,8 +17,8 @@ tests stored in it.
 
 ### Options
 
-"-u", "--url": Url to be tested
-"-f", "--file": File name with URLS to test, Currently not available
+"-u", "--url": Url to be tested 
+"-f", "--file": File name with URLS to test, Currently not available 
 "-x", "--xunit": Name of file that you wish to write to. Defaults to garmr-results.xml
 
 
