@@ -162,6 +162,9 @@ def main():
     parser.add_option("-f", "--file", action="store", type="string",
                     dest="file_name", 
                     help="File name with URLS to test, Currently not available")
+    parser.add_option("-x", "--xunit", action="store", type="string",
+                    dest="xunit",
+                    help="Name of file that you wish to write to")
 
     (options, args) = parser.parse_args()
     if not options:
