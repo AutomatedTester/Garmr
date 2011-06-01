@@ -24,7 +24,7 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s" />""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
         assert result["time_taken"] == 1
         assert result["errors"] == 0
@@ -41,9 +41,9 @@ class TestReports:
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        expected = """<testcase classname="" name="%s" time="%s"/>""" % \
+        expected = """<testcase classname="" name="%s" time="%s" />""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
-        expected += """<testcase classname="" name="%s" time="%s"/>""" % \
+        expected += """<testcase classname="" name="%s" time="%s" />""" % \
                         (tests_list[1]["name"], tests_list[1]["time_taken"]) 
         assert result["testcase"] == expected, result["testcase"]
         assert result["time_taken"] == 2
@@ -56,18 +56,20 @@ class TestReports:
         tests_list = []
         tests_list.append({"name":"error test",
                            "time_taken": 1,
-                           "errors" : True
+                           "errors" : True,
+                           "message" : "omg i errored",
             })
         tests_list.append({"name":"failure test",
                            "time_taken": 1,
-                           "failed" : True
+                           "failed" : True,
+                           "message": "Omg I failed",
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        expected = """<testcase classname="" name="%s" time="%s"/>""" % \
-                        (tests_list[0]["name"], tests_list[0]["time_taken"])
-        expected += """<testcase classname="" name="%s" time="%s"/>""" % \
-                        (tests_list[1]["name"], tests_list[1]["time_taken"]) 
+        expected = """<testcase classname="" name="%s" time="%s" ><error>%s</error></testcase>""" % \
+                        (tests_list[0]["name"], tests_list[0]["time_taken"],tests_list[0]["message"])
+        expected += """<testcase classname="" name="%s" time="%s" ><failure>%s</failure></testcase>""" % \
+                        (tests_list[1]["name"], tests_list[1]["time_taken"],tests_list[1]["message"]) 
         assert result["testcase"] == expected, result["testcase"]
         assert result["time_taken"] == 2
         assert result["errors"] == 1
@@ -79,11 +81,12 @@ class TestReports:
         tests_list.append({"name":"failedtest",
                            "time_taken": 1,
                            "failed": True,
+                           "message": "Omg I failed",
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
-                        (tests_list[0]["name"], tests_list[0]["time_taken"])
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s" ><failure>%s</failure></testcase>""" % \
+                        (tests_list[0]["name"], tests_list[0]["time_taken"],tests_list[0]["message"])
         assert result["time_taken"] == 1
         assert result["errors"] == 0
         assert result["failed"] == 1 
@@ -94,11 +97,12 @@ class TestReports:
         tests_list.append({"name":"errorstest",
                            "time_taken": 1,
                            "errors": True,
+                           "message": "Omg I errored"
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
-                        (tests_list[0]["name"], tests_list[0]["time_taken"])
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s" ><error>%s</error></testcase>""" % \
+                        (tests_list[0]["name"], tests_list[0]["time_taken"],tests_list[0]["message"])
         assert result["time_taken"] == 1
         assert result["errors"] == 1
         assert result["failed"] == 0 
@@ -109,11 +113,12 @@ class TestReports:
         tests_list.append({"name":"skipstest",
                            "time_taken": 1,
                            "skips": True,
+                           "message": "Omg I skipped"
             })
         reporter = Reporter(tests_list)
         result = reporter._format_results()
-        assert result["testcase"] == """<testcase classname="" name="%s" time="%s"/>""" % \
-                        (tests_list[0]["name"], tests_list[0]["time_taken"])
+        assert result["testcase"] == """<testcase classname="" name="%s" time="%s" ><skipped>%s</skipped></testcase>""" % \
+                        (tests_list[0]["name"], tests_list[0]["time_taken"],tests_list[0]["message"])
         assert result["time_taken"] == 1
         assert result["errors"] == 0
         assert result["failed"] == 0 
@@ -129,7 +134,7 @@ class TestReports:
             skips="{skips}" tests="{numtests}" time="{timetaken}">
             {testresults}
         </testsuite>"""
-        testcase = """<testcase classname="" name="%s" time="%s"/>""" % \
+        testcase = """<testcase classname="" name="%s" time="%s" />""" % \
                         (tests_list[0]["name"], tests_list[0]["time_taken"])
 
         expected = suite_xml.format(error=0, failure=0, skips=0, numtests=len(tests_list), 

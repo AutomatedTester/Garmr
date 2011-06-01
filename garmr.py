@@ -67,7 +67,8 @@ class Reporter(object):
 
 
     def _format_results(self):
-        testcase = """<testcase classname="" name="{testname}" time="{timetaken}"/>"""
+        testcase = """<testcase classname="" name="{testname}" time="{timetaken}" """
+        errs = '><{errtype}>{message}</{errtype}></testcase>'
         formatted_results = ""
         results = {"time_taken":0,
                     "errors" : 0,
@@ -81,10 +82,15 @@ class Reporter(object):
                     testname = res["name"],timetaken=res["time_taken"])
             if res.has_key("errors"):
                 results["errors"] += 1
-            if res.has_key("failed"):
+                formatted_results +=  errs.format(errtype="error", message=res["message"])
+            elif res.has_key("failed"):
                 results["failed"] += 1
-            if res.has_key("skips"):
+                formatted_results += errs.format(errtype="failure", message=res["message"])
+            elif res.has_key("skips"):
                 results["skips"] += 1
+                formatted_results += errs.format(errtype="skipped", message=res["message"])
+            else:
+                formatted_results += "/>"
             results["time_taken"] += res["time_taken"]
         
         results["testcase"] = formatted_results
@@ -112,11 +118,14 @@ class Garmr(object):
 
                 logger.info("x-frame-options were correct")
             except KeyError:
+                message = "x-frame-options were not found in headers"
                 result["failed"] = True
-                logger.critical("x-frame-options were not found in headers")
+                result["message"] = message
+                logger.critical(message)
         except AssertionError as e:
             logger.error(str(e))
             result["errors"] = True
+            result["message"] = str(e)
         finish = datetime.now()
         result["time_taken"] = self._total_seconds(start, finish)
         logger.debug("Time Taken: %s:" % result["time_taken"])
@@ -142,6 +151,7 @@ class Garmr(object):
         except Exception, e:
             logger.error(str(e))
             result["errors"] = True
+            result["message"] = str(e)
         finish = datetime.now()
         result["time_taken"] = self._total_seconds(start, finish)
         logger.debug("Time Taken: %s:" % result["time_taken"])
@@ -160,6 +170,7 @@ class Garmr(object):
         except AssertionError, e:
             logger.error(str(e))
             result["errors"] = True
+            result["message"] = str(e)
         finish = datetime.now()
         result["time_taken"] = self._total_seconds(start, finish)
         logger.debug("Time Taken: %s:" % result["time_taken"])
