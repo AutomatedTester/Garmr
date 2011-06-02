@@ -3,7 +3,7 @@ import sys
 from setuptools import setup, find_packages
 def main():
     setup(name='Garmr',
-          version='0.1',
+          version='0.2',
           description='A tool for testing a web application for basic security holes',
           author='David Burns',
           author_email='dburns at mozilladotcom',
