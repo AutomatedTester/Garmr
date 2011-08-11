@@ -5,6 +5,8 @@ import urllib2
 from optparse import OptionParser
 import logging
 from datetime import datetime
+from corechecks import CoreChecks
+from results import GarmrResult
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s')
@@ -77,123 +79,46 @@ class Reporter(object):
                     "tests" : 0}
         
         for res in self.results:
-            results["tests"] += 1
-            formatted_results +=  testcase.format(
-                    testname = res["name"],timetaken=res["time_taken"])
-            if res.has_key("errors"):
-                results["errors"] += 1
-                formatted_results +=  errs.format(errtype="error", message=res["message"])
-            elif res.has_key("failed"):
-                results["failed"] += 1
-                formatted_results += errs.format(errtype="failure", message=res["message"])
-            elif res.has_key("skips"):
-                results["skips"] += 1
-                formatted_results += errs.format(errtype="skipped", message=res["message"])
-            else:
-                formatted_results += "/>"
-            results["time_taken"] += res["time_taken"]
+            try:
+                results["tests"] += 1
+                formatted_results +=  testcase.format(
+                        testname = res["name"],timetaken=res["time_taken"])
+                if res.has_key("errors"):
+                    results["errors"] += 1
+                    formatted_results +=  errs.format(errtype="error", message=res["message"])
+                elif res.has_key("failed"):
+                    results["failed"] += 1
+                    formatted_results += errs.format(errtype="failure", message=res["message"])
+                elif res.has_key("skips"):
+                    results["skips"] += 1
+                    formatted_results += errs.format(errtype="skipped", message=res["message"])
+                else:
+                    formatted_results += "/>"
+                results["time_taken"] += res["time_taken"]
+            except:
+                logger.error("bad type, fix the reporter!")
         
         results["testcase"] = formatted_results
         return results
 
+
 class Garmr(object):
 
-
-    def __init__(self, urls):
+    def __init__(self, urls, logger):
         self.urls = urls
-
-    def xframe_checks(self):
-        result = {}
-        result["name"] = self.xframe_checks.__name__
-        start = datetime.now()
-        try:
-            response = urllib2.urlopen(self.urls) 
-            response_headers = response.headers.headers
-            headers = self._clean_header(response_headers)
-            logger.info("Checking x-frame-options")
-            try:
-                assert headers["x-frame-options"] == "DENY" or \
-            	    headers["x-frame-options"] == "SAMEORIGIN", \
-                	"x-frame-options were: %s" % headers["x-frame-options"]
-
-                logger.info("x-frame-options were correct")
-            except KeyError:
-                message = "x-frame-options were not found in headers"
-                result["failed"] = True
-                result["message"] = message
-                logger.critical(message)
-        except AssertionError as e:
-            logger.error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = self._total_seconds(start, finish)
-        logger.debug("Time Taken: %s:" % result["time_taken"])
-        return result
+        self._logger = logger
+    
+    def run_tests(self, tests, results):
+        results.append(tests.trace_checks(self, self.urls))
+        results.append(tests.xframe_checks(self, self.urls))
+        results.append(tests.redirect_checks(self, self.urls))
+        results.append(tests.xframe_checks2(self, self.urls))
         
-    def trace_checks(self):
-        result = {}
-        result["name"] = self.trace_checks.__name__
-        start = datetime.now()
-    	try:
-            logger.info("Checking TRACE is not valid")
-            http_urls = self._clean_url(self.urls) 
-            request = httplib.HTTPConnection(http_urls[0])
-            if len(http_urls) > 1:
-                request.request("TRACE", http_urls[1])
-            else:
-                request.request("TRACE", "/")
-                
-            request.getresponse()
-            raise Exception("TRACE is a valid HTTP call")
-        except httplib.BadStatusLine, e:
-            logger.info("TRACE is not valid")
-        except Exception, e:
-            logger.error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = self._total_seconds(start, finish)
-        logger.debug("Time Taken: %s:" % result["time_taken"])
-        return result
-
-
-    def redirect_checks(self):
-        result = {}
-        result["name"] = self.redirect_checks.__name__
-        start = datetime.now()
-        response = urllib2.urlopen(self.urls)
-        try:
-            logger.info("Checking for HTTPS")
-            assert "https://" in response.geturl(), "Have not been redirected to HTTPS"
-            logger.info("Redirected to HTTPS version of site")
-        except AssertionError, e:
-            logger.error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = self._total_seconds(start, finish)
-        logger.debug("Time Taken: %s:" % result["time_taken"])
-        return result
-
-    def _clean_header(self, response_headers):
-    	headers = {}
-    	for head in response_headers:
-        	lst = head.strip(" \r\n").split(":")
-	        headers[lst[0]] = lst[1].strip()
-    	return headers
-
-    def _clean_url(self, urls):
-        import re
-        mtch = re.search("https?://([^/]*?)(/.*)?", urls)
-        split = []
-        for matches in mtch.groups():
-            split.append(matches)
-        return split
-
-    def _total_seconds(self, start, finish):
-        td = finish - start
-        return float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
+    
+    
+    
+    def logger(self):
+        return self._logger
 
 def main():
     usage = "Usage: %prog [option] arg"
@@ -206,17 +131,17 @@ def main():
     parser.add_option("-x", "--xunit", action="store", type="string",
                     dest="xunit", default='garmr-results.xml',
                     help="Name of file that you wish to write to")
-
+    
+    GarmrResult.logger = logger
     (options, args) = parser.parse_args()
     if options.aut is None and options.file_name is None:
         parser.error("Please supply an argument")
 
     test_results = []
 
-    garmr = Garmr(options.aut)
-    test_results.append(garmr.trace_checks())
-    test_results.append(garmr.xframe_checks())
-    test_results.append(garmr.redirect_checks())
+    test_suite = CoreChecks()
+    garmr = Garmr(options.aut, logger)
+    garmr.run_tests(test_suite, test_results)
     reporter = Reporter(test_results)
     reporter.write_results(file_name=options.xunit)
 
