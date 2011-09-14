@@ -1,108 +1,89 @@
-#!/usr/bin/python
+from urlparse import urlparse
+import requests
+from scanner import ActiveTest, PassiveTest, Scanner, get_url
 
-from results import GarmrResult
-import gadgets
-import httplib
-from datetime import datetime
-
-class CoreChecks:
-    def __init__(self):
-        self.version = 1
-
-    def xframe_checks2(self, garmr, url):
-        result = GarmrResult("x-frame-checks")
-        result.append("name", self.xframe_checks.__name__)
-        try:
-            response = gadgets.open_url(url) 
-            response_headers = response.headers.headers
-            headers = gadgets.clean_header(response_headers)
-            
-            result.info("Checking x-frame-options")
-            try:
-                assert headers["x-frame-options"] == "DENY" or \
-                    headers["x-frame-options"] == "SAMEORIGIN", \
-                    "x-frame-options were: %s" % headers["x-frame-options"]
-                result.succeed("x-frame-options were correct")    
-            except KeyError:
-                message = "x-frame-options were not found in headers"
-                result.fail(message)        
-        except AssertionError as e:
-            result.incomplete(str(e))
-            
-        result.append("time_taken", result.duration())
-        result.debug("Time Taken: %s:" % result.duration)
-        return result
-
-    def xframe_checks(self, garmr, url):
-        result = {}
-        result["name"] = self.xframe_checks.__name__
-        start = datetime.now()
-        try:
-            response = gadgets.open_url(url) 
-            response_headers = response.headers.headers
-            headers = gadgets.clean_header(response_headers)
-            garmr.logger().info("Checking x-frame-options")
-            try:
-                assert headers["x-frame-options"] == "DENY" or \
-            	    headers["x-frame-options"] == "SAMEORIGIN", \
-                	"x-frame-options were: %s" % headers["x-frame-options"]
-
-                garmr.logger().info("x-frame-options were correct")
-            except KeyError:
-                message = "x-frame-options were not found in headers"
-                result["failed"] = True
-                result["message"] = message
-                garmr.logger().critical(message)
-        except AssertionError as e:
-            garmr.logger().error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = gadgets.total_seconds(start, finish)
-        garmr.logger().debug("Time Taken: %s:" % result["time_taken"])
-        return result
+class StsHeaderPresent(PassiveTest):
+    
+    secure_only = True
+    stsheader = "Strict-Transport-Security"
+    
+    def analyze(self, response):
         
-    def trace_checks(self, garmr, url):
-        result = {}
-        result["name"] = self.trace_checks.__name__
-        start = datetime.now()
-        try:
-            garmr.logger().info("Checking TRACE is not valid")
-            http_urls = gadgets.clean_url(url) 
-            request = httplib.HTTPConnection(http_urls[0])
-            if len(http_urls) > 1:
-                request.request("TRACE", http_urls[1])
+        sts = selfstsheader in response.headers
+        if sts == False:
+            result = self.result("Fail", "STS header not found.", None)
+        else:
+            
+            result = self.result("Pass", "STS header present.", response.headers[self.stsheader])
+        return result
+
+class XfoPresent(PassiveTest):
+    
+    description = "Check if X-Frame-Options header is present."
+    
+    def analyze(self, response):
+        xfoheader = "x-frame-options"
+        xfo = xfoheader in response.headers
+        if xfo == False:
+            result = self.result("Fail", "XFO header not found.", None)
+        else:
+            result = self.result("Pass", "XFO header present.", response.headers[xfoheader])
+        return result
+
+class RobotsTest(ActiveTest):
+    run_passives = True
+    description = "Check for, and save the contents of robots.txt if it is present on the server."
+        
+    def do_test(self, url):
+        u = urlparse(url)
+        roboturl="%s://%s/robots.txt" % (u.scheme, u.netloc)
+        response = requests.get(roboturl)
+        if response.status_code == 200:
+            result = self.result("Pass", "A robots.txt file is present on the server", response.content)
+        else:
+            result = self.result("Fail", "No robots.txt file was found.", None)
+        return (result, response);
+    
+class StsUpgradeCheck(ActiveTest):
+    run_passives = False
+    description = "Inspect the STS redirect process."
+    stsheader = "Strict-Transport-Security"
+    
+    def do_test(self, url):
+        u = urlparse(url)
+        if u.scheme == "http":
+            correct_header = False
+            bad_redirect = False
+            response1 = get_url(url, False)
+            invalid_header = self.stsheader in response1.headers
+            is_redirect = response1.status_code == 301
+            if is_redirect == True:
+                redirect = response1.headers["location"]
+                r = urlparse(redirect)
+                if r.scheme == "https":
+                    response2 = get_url(redirect, False)
+                    correct_header = self.stsheader in response2.headers
+                else:
+                    bad_redirect = True
+                    
+            success = invalid_header == False and is_redirect == True and correct_header == True
+            if success == True:
+                message = "The STS upgrade occurs properly (no STS header on HTTP, a 301 redirect, and an STS header in the subsequent request."
             else:
-                request.request("TRACE", "/")
-                
-            request.getresponse()
-            raise Exception("TRACE is a valid HTTP call")
-        except httplib.BadStatusLine, e:
-            garmr.logger().info("TRACE is not valid")
-        except Exception, e:
-            garmr.logger().error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = gadgets.total_seconds(start, finish)
-        garmr.logger().debug("Time Taken: %s:" % result["time_taken"])
-        return result
-
-
-    def redirect_checks(self, garmr, url):
-        result = {}
-        result["name"] = self.redirect_checks.__name__
-        start = datetime.now()
-        response = gadgets.open_url(url)
-        try:
-            garmr.logger().info("Checking for HTTPS")
-            assert "https://" in response.geturl(), "Have not been redirected to HTTPS"
-            garmr.logger().info("Redirected to HTTPS version of site")
-        except AssertionError, e:
-            garmr.logger().error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = gadgets.total_seconds(start, finish)
-        garmr.logger().debug("Time Taken: %s:" % result["time_taken"])
-        return result
+                message = "%s%s%s%s" % (
+                    "The initial HTTP response included an STS header (RFC violation)." if invalid_header else "",
+                    "" if is_redirect else "The initial HTTP response should be a 301 redirect (RFC violation).",
+                    "" if correct_header else "The followup to the 301 redirect must include the STS header.",
+                    "The 301 location must use the https scheme." if bad_redirect else ""
+                    )
+            result = self.result("Pass" if success else "Fail", message, None)
+            return (result, response1)
+    
+        
+def configure(scanner):
+    if isinstance(scanner, Scanner) == False:
+        raise Exception("Cannot configure a non-scanner object!")
+    scanner.register_test(StsHeaderPresent())
+    scanner.register_test(XfoPresent())
+    scanner.register_test(RobotsTest())
+    scanner.register_test(StsUpgradeCheck())
