@@ -59,6 +59,8 @@ class Scanner():
     logger.setLevel(logging.DEBUG)
     
     def __init__(self):
+        self.resolve_target = True
+        self.force_passives = False
         self._passive_tests_ = []
         self._active_tests_ = []
         self._targets_ = []
@@ -77,7 +79,7 @@ class Scanner():
                 Scanner.logger.info("\t[Skip] [%s] (reason: secure_only)" % test.__class__)
                 continue
             elif (test.insecure_only and is_ssl):
-                Scanner.logger.info("\t[Skip] [%s] (reason: insecure_only" % test.__class__)
+                Scanner.logger.info("\t[Skip] [%s] (reason: insecure_only)" % test.__class__)
                 continue
             start = datetime.now()
             o = test.execute(target)
@@ -107,25 +109,27 @@ class Scanner():
     
     def run_scan(self):
         for target in self._targets_:
-    #        try:
-            self.scan_target(target)
-#           except Exception, e:
-#              print "kaboom? %s" % e
+            try:
+                self.scan_target(target)
+            except:
+                Scanner.logger.error(traceback.format_exc())
+
     
     def register_target(self, url):
         u = urlparse(url)
         valid = u.netloc != "" and u.scheme in self._protos_
         reason = "%s%s" % ("[bad netloc]" if u.netloc == "" else "", "" if u.scheme in self._protos_ else "[bad scheme]")
-        # todo - allow an option to disable dns resolution since address resolution may fail, but a host may
-        #        still be reachable through a proxy
+        
         # todo - support ipv6 urls
         host = u.netloc.split(':')[0]
-        try:
-            socket.getaddrinfo(host, None)
-        except socket.gaierror:
-            valid = False
-            reason = "%s[dns]" % reason
-            
+        if (self.resolve_target):
+            try:
+                socket.getaddrinfo(host, None)
+            except socket.gaierror:
+                valid = False
+                reason = "%s[dns]" % reason
+        else:
+            valid = True
         if valid:
             self._targets_.append(url)
             Scanner.logger.debug("[target]: %s" % url)

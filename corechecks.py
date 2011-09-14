@@ -2,19 +2,55 @@ from urlparse import urlparse
 import requests
 from scanner import ActiveTest, PassiveTest, Scanner, get_url
 
+
+class HttpOnlyPresent(PassiveTest):
+    
+    def analyze(self, response):
+        cookieheader = "Set-Cookie"
+        has_cookie = cookieheader in response.headers
+        if has_cookie:
+            if "httponly" in response.headers[cookieheader].lower():
+                result = self.result("Pass", "HttpOnly is set", response.headers[cookieheader])
+            else:
+                result = self.result("Fail", "HttpOnly is not set", response.headers[cookieheader])            
+        else:
+            result = self.result("Pass", "No cookie is set by this request.", None)
+        return result
+    
+class SecureAttributePresent(PassiveTest):
+    
+    def analyze(self, response):
+        url = urlparse(response.url)
+        cookieheader = "Set-Cookie"
+        has_cookie = cookieheader in response.headers
+        if has_cookie:
+            if "httponly" in response.headers[cookieheader].lower():
+                if url.scheme == "https":
+                    result = self.result("Pass", "HttpOnly is set", response.headers[cookieheader])
+                else:
+                    result = self.result("Fail", "HttpOnly should only be set for cookies sent over SSL.", response.headers[cookieheader]) 
+            else:
+                if url.scheme == "https":
+                    result = self.result("Fail", "HttpOnly is not set", response.headers[cookieheader])
+                else:
+                    result = self.result("Pass", "The secure attribute is not set (expected for HTTP)", response.headers[cookieheader])            
+        else:
+            result = self.result("Pass", "No cookie is set by this request.", None)
+        return result
+        
+
 class StsHeaderPresent(PassiveTest):
     
     secure_only = True
-    stsheader = "Strict-Transport-Security"
     
     def analyze(self, response):
-        
-        sts = selfstsheader in response.headers
+        stsheader = "Strict-Transport-Security"
+        sts = stsheader in response.headers
         if sts == False:
             result = self.result("Fail", "STS header not found.", None)
         else:
             
-            result = self.result("Pass", "STS header present.", response.headers[self.stsheader])
+            result = self.result("Pass", "STS header present.", response.headers[stsheader])
         return result
 
 class XfoPresent(PassiveTest):
@@ -45,24 +81,25 @@ class RobotsTest(ActiveTest):
         return (result, response);
     
 class StsUpgradeCheck(ActiveTest):
+    insecure_only = True
     run_passives = False
     description = "Inspect the STS redirect process."
-    stsheader = "Strict-Transport-Security"
     
     def do_test(self, url):
+        stsheader = "Strict-Transport-Security"
         u = urlparse(url)
         if u.scheme == "http":
             correct_header = False
             bad_redirect = False
             response1 = get_url(url, False)
-            invalid_header = self.stsheader in response1.headers
+            invalid_header = stsheader in response1.headers
             is_redirect = response1.status_code == 301
             if is_redirect == True:
                 redirect = response1.headers["location"]
                 r = urlparse(redirect)
                 if r.scheme == "https":
                     response2 = get_url(redirect, False)
-                    correct_header = self.stsheader in response2.headers
+                    correct_header = stsheader in response2.headers
                 else:
                     bad_redirect = True
                     
@@ -87,3 +124,5 @@ def configure(scanner):
     scanner.register_test(XfoPresent())
     scanner.register_test(RobotsTest())
     scanner.register_test(StsUpgradeCheck())
+    scanner.register_test(HttpOnlyPresent())
+    scanner.register_test(SecureAttributePresent())
