@@ -69,17 +69,28 @@ class Scanner():
         self.reporter = Reporter()
     
     def scan_target(self, target):
+        self.reporter.write_target(target)
         Scanner.logger.info("[%s] scanning:" % target)
         url = urlparse(target)
         is_ssl = url.scheme == "https"
         results = {}
-                
+        self.reporter.start_actives()
         for test in self._active_tests_:
             if (test.secure_only and not is_ssl):
                 Scanner.logger.info("\t[Skip] [%s] (reason: secure_only)" % test.__class__)
+                result = ActiveTest().result("Skip", "This check is only applicable to SSL requests", None)
+                result['start'] = datetime.now()
+                result['end'] = result['start']
+                result['duration'] = 0
+                results[test.__class__]
                 continue
             elif (test.insecure_only and is_ssl):
                 Scanner.logger.info("\t[Skip] [%s] (reason: insecure_only)" % test.__class__)
+                result = ActiveTest().result("Skip", "This check is only applicable to SSL requests", None)
+                result['start'] = datetime.now()
+                result['end'] = result['start']
+                result['duration'] = 0
+                results[test.__class__] = result
                 continue
             start = datetime.now()
             o = test.execute(target)
@@ -87,32 +98,53 @@ class Scanner():
             response = o[1]
             end = datetime.now()
             td = end - start
-            duration = float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
             result['start'] = start
             result['end'] = end
-            result['duration'] = duration
+            result['duration'] = float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
             Scanner.logger.info("\t[%s] %s %s" % (test.__class__, result['state'], result['message']))
+            self.reporter.write_active(test.__class__, result)
             if (result['state'] == "Error"):
                 Scanner.logger.error(result['data'])
             if response != None and test.run_passives:
                 result['passive'] = {}
+                self.reporter.start_passives()
                 for passive in self._passive_tests_:
                     if passive.secure_only and not is_ssl:
                         Scanner.logger.debug("\t\t[%s] Skip Test invalid for http scheme" % passive.__class__)                        
-                        result["passive"][self.__class__] = PassiveTest().result("Skip", "This check is only applicable to SSL requests.", None)
-                        continue
-                    passive_result = passive.analyze(response)
-                    Scanner.logger.info("\t\t[%s] %s %s" % (passive.__class__, passive_result['state'], passive_result['message']))
+                        passive_result = PassiveTest().result("Skip", "This check is only applicable to SSL requests.", None)
+                        start = datetime.now()
+                        passive_result['start'] = start
+                        passive_result['end'] = start
+                        passive_result["duration"] = 0
+                    else:
+                        start = datetime.now()
+                        passive_result = passive.analyze(response)
+                        end = datetime.now()
+                        td = end - start
+                        passive_result['start'] = start
+                        passive_result['end'] = end
+                        passive_result['duration'] = float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
+                        Scanner.logger.info("\t\t[%s] %s %s" % (passive.__class__, passive_result['state'], passive_result['message']))
                     result["passive"][passive.__class__] = passive_result
+                    self.reporter.write_passive(passive.__class__,passive_result)
+                self.reporter.end_passives()
             results[test.__class__] = result
+        self.reporter.end_actives()
         return results
     
     def run_scan(self):
+        results = {}
+        self.reporter.start_report()
+        self.reporter.start_targets()
         for target in self._targets_:
             try:
-                self.scan_target(target)
+                results[target] = self.scan_target(target)
             except:
                 Scanner.logger.error(traceback.format_exc())
+        self.reporter.end_targets()
+        file = open(self.output, "w")
+        file.write(self.reporter.end_report())
+        file.close()
 
     
     def register_target(self, url):

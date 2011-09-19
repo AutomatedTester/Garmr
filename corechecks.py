@@ -14,7 +14,7 @@ class HttpOnlyPresent(PassiveTest):
             else:
                 result = self.result("Fail", "HttpOnly is not set", response.headers[cookieheader])            
         else:
-            result = self.result("Pass", "No cookie is set by this request.", None)
+            result = self.result("Skip", "No cookie is set by this response.", None)
         return result
     
 class SecureAttributePresent(PassiveTest):
@@ -35,7 +35,7 @@ class SecureAttributePresent(PassiveTest):
                 else:
                     result = self.result("Pass", "The secure attribute is not set (expected for HTTP)", response.headers[cookieheader])            
         else:
-            result = self.result("Pass", "No cookie is set by this request.", None)
+            result = self.result("Skip", "No cookie is set by this response.", None)
         return result
         
 
