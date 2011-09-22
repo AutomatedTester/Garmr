@@ -1,6 +1,7 @@
 from datetime import datetime
 from reporter import Reporter
 from urlparse import urlparse
+import ConfigParser
 import logging
 import requests
 import socket
@@ -61,12 +62,68 @@ class Scanner():
     def __init__(self):
         self.resolve_target = True
         self.force_passives = False
-        self._passive_tests_ = []
-        self._active_tests_ = []
+        self._passive_tests_ = {}
+        self._active_tests_ = {}
         self._targets_ = []
         self._protos_ = ["http", "https"]
         Scanner.logger.debug("Scanner initialized.")
         self.reporter = Reporter()
+        self.modules = []
+    
+    def do_passive_scan(self, passive, is_ssl, response):
+        if passive.secure_only and not is_ssl:
+            Scanner.logger.debug("\t\t[%s] Skip Test invalid for http scheme" % passive.__class__)                        
+            passive_result = PassiveTest().result("Skip", "This check is only applicable to SSL requests.", None)
+            start = datetime.now()
+            passive_result['start'] = start
+            passive_result['end'] = start
+            passive_result["duration"] = 0
+        else:
+            start = datetime.now()
+            passive_result = passive.analyze(response)
+            end = datetime.now()
+            td = end - start
+            passive_result['start'] = start
+            passive_result['end'] = end
+            passive_result['duration'] = float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
+            Scanner.logger.info("\t\t[%s] %s %s" % (passive.__class__, passive_result['state'], passive_result['message']))
+        return passive_result
+    
+    def do_active_scan(self, test, is_ssl, target):
+        if (test.secure_only and not is_ssl):
+            Scanner.logger.info("\t[Skip] [%s] (reason: secure_only)" % test.__class__)
+            result = ActiveTest().result("Skip", "This check is only applicable to SSL requests", None)
+            result['start'] = datetime.now()
+            result['end'] = result['start']
+            result['duration'] = 0
+            return result
+        elif (test.insecure_only and is_ssl):
+            Scanner.logger.info("\t[Skip] [%s] (reason: insecure_only)" % test.__class__)
+            result = ActiveTest().result("Skip", "This check is only applicable to SSL requests", None)
+            result['start'] = datetime.now()
+            result['end'] = result['start']
+            result['duration'] = 0
+            return result
+        start = datetime.now()
+        result, response = test.execute(target)
+        end = datetime.now()
+        td = end - start
+        result['start'] = start
+        result['end'] = end
+        result['duration'] = float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
+        Scanner.logger.info("\t[%s] %s %s" % (test.__class__, result['state'], result['message']))
+        self.reporter.write_active(test.__class__, result)
+        if (result['state'] == "Error"):
+            Scanner.logger.error(result['data'])
+        if response != None and test.run_passives:
+            result['passive'] = {}
+            self.reporter.start_passives()
+            for passive_key in self._passive_tests_.keys():
+                passive = self._passive_tests_[passive_key]["test"]                    
+                result["passive"][passive.__class__] = self.do_passive_scan(passive, is_ssl, response)
+                self.reporter.write_passive(passive.__class__, result["passive"][passive.__class__])
+            self.reporter.end_passives()
+        return result
     
     def scan_target(self, target):
         self.reporter.write_target(target)
@@ -75,60 +132,9 @@ class Scanner():
         is_ssl = url.scheme == "https"
         results = {}
         self.reporter.start_actives()
-        for test in self._active_tests_:
-            if (test.secure_only and not is_ssl):
-                Scanner.logger.info("\t[Skip] [%s] (reason: secure_only)" % test.__class__)
-                result = ActiveTest().result("Skip", "This check is only applicable to SSL requests", None)
-                result['start'] = datetime.now()
-                result['end'] = result['start']
-                result['duration'] = 0
-                results[test.__class__]
-                continue
-            elif (test.insecure_only and is_ssl):
-                Scanner.logger.info("\t[Skip] [%s] (reason: insecure_only)" % test.__class__)
-                result = ActiveTest().result("Skip", "This check is only applicable to SSL requests", None)
-                result['start'] = datetime.now()
-                result['end'] = result['start']
-                result['duration'] = 0
-                results[test.__class__] = result
-                continue
-            start = datetime.now()
-            o = test.execute(target)
-            result = o[0]
-            response = o[1]
-            end = datetime.now()
-            td = end - start
-            result['start'] = start
-            result['end'] = end
-            result['duration'] = float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
-            Scanner.logger.info("\t[%s] %s %s" % (test.__class__, result['state'], result['message']))
-            self.reporter.write_active(test.__class__, result)
-            if (result['state'] == "Error"):
-                Scanner.logger.error(result['data'])
-            if response != None and test.run_passives:
-                result['passive'] = {}
-                self.reporter.start_passives()
-                for passive in self._passive_tests_:
-                    if passive.secure_only and not is_ssl:
-                        Scanner.logger.debug("\t\t[%s] Skip Test invalid for http scheme" % passive.__class__)                        
-                        passive_result = PassiveTest().result("Skip", "This check is only applicable to SSL requests.", None)
-                        start = datetime.now()
-                        passive_result['start'] = start
-                        passive_result['end'] = start
-                        passive_result["duration"] = 0
-                    else:
-                        start = datetime.now()
-                        passive_result = passive.analyze(response)
-                        end = datetime.now()
-                        td = end - start
-                        passive_result['start'] = start
-                        passive_result['end'] = end
-                        passive_result['duration'] = float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
-                        Scanner.logger.info("\t\t[%s] %s %s" % (passive.__class__, passive_result['state'], passive_result['message']))
-                    result["passive"][passive.__class__] = passive_result
-                    self.reporter.write_passive(passive.__class__,passive_result)
-                self.reporter.end_passives()
-            results[test.__class__] = result
+        for key in self._active_tests_.keys():
+            test = self._active_tests_[key]["test"]
+            results[test.__class__] = self.do_active_scan(test, is_ssl, target)
         self.reporter.end_actives()
         return results
     
@@ -136,6 +142,9 @@ class Scanner():
         results = {}
         self.reporter.start_report()
         self.reporter.start_targets()
+        if len(self._targets_) == 0:
+            Scanner.logger.error('No targets configured.')
+            return
         for target in self._targets_:
             try:
                 results[target] = self.scan_target(target)
@@ -167,14 +176,79 @@ class Scanner():
             Scanner.logger.debug("[target]: %s" % url)
             return
         Scanner.logger.error("%s is not a valid target (reason: %s)" % (url, reason))
+        
+    def configure_check(self, check_name, key, value):
+        if self._active_tests_.has_key(check_name):
+            check = self._active_tests_[check_name]["test"]
+        elif self._passive_tests_.has_key(check_name):
+            check = self._passive_tests_[check_name]["test"]
+        else:
+            raise Exception("The requested check is not available (%s)" % check_name)
+        if hasattr(check, "config") == False:
+            raise Exception("This check cannot be configured.")
+        if check.config.has_key(key) == False:
+            raise Exception("%s is not a valid configuration for %s", key, check_name)
+        check.config[key] = value
+        Scanner.logger.debug("\t%s.%s=%s" % (check_name, key, value))
     
-    def register_test(self, test):
+    def disable_check(self, check_name):
+        if self._active_tests_.has_key(check_name):
+            self._active_tests_[check_name]["enabled"] = False
+        elif self._passive_tests_.has_key(check_name):
+            self._passive_tests_[check_name]["enabled"] = False
+        else:
+            raise Exception("The requested check is not available (%s)" % check_name)
+        Scanner.logger.debug("\t%s disabled.", check_name)
+        
+    def register_check(self, test):
+        module = test.__class__.__module__
+        
+        if module not in self.modules:
+            self.modules.append(module)
+            
+        key = "%s" % test.__class__
         if isinstance(test, ActiveTest):
-            self._active_tests_.append(test)
+            self._active_tests_[key]= { "test" : test , "enabled" : True}
             Scanner.logger.debug("Added %s to active tests." % test.__class__)
             return len(self._active_tests_)
         if isinstance(test, PassiveTest):
-            self._passive_tests_.append(test)
+            self._passive_tests_[key]= { "test" : test, "enabled" : True}
             Scanner.logger.debug("Added %s to passive tests." % test.__class__)
             return len(self._passive_tests_)
         raise Exception('test is not a valid test type')
+    
+    def save_configuration(self, path):
+        # write out a configuration file.
+        config = ConfigParser.RawConfigParser()
+        config.add_section("Garmr")
+        config.set("Garmr", "force-passives", self.force_passives)
+        config.set("Garmr", "module", ", ".join(self.modules))
+        config.set("Garmr", "reporter", self.reporter.__class__)
+        config.set("Garmr", "output", self.output)
+        config.set("Garmr", "dns", self.resolve_target)
+        
+        if len(self._targets_) > 0:
+            config.add_section("Targets")
+            i = 0
+            for target in self._targets_:
+                config.set("Targets", "%s"%i, target)
+        
+        for check in self._active_tests_.keys():
+            config.add_section(check)
+            config.set(check, "enabled", self._active_tests_[check]["enabled"])
+            if hasattr(self._active_tests_[check]["test"], "config"):
+                for key in self._active_tests_[check]["test"].config.keys():
+                    config.set(check, key, self._active_tests_[check]["test"].config[key])
+        
+        for check in self._passive_tests_.keys():
+            config.add_section(check)
+            config.set(check, "enabled", self._passive_tests_[check]["enabled"])
+            if hasattr(self._passive_tests_[check]["test"], "config"):
+                for key in self._passive_tests_[check]["test"].config.keys():
+                    config.set(check, key, self._passive_tests_[check]["test"].config[key])
+
+                    
+        with open(path, 'w') as configfile:
+            config.write(configfile)
+        
+        

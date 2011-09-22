@@ -49,7 +49,6 @@ class StsHeaderPresent(PassiveTest):
         if sts == False:
             result = self.result("Fail", "STS header not found.", None)
         else:
-            
             result = self.result("Pass", "STS header present.", response.headers[stsheader])
         return result
 
@@ -120,9 +119,9 @@ class StsUpgradeCheck(ActiveTest):
 def configure(scanner):
     if isinstance(scanner, Scanner) == False:
         raise Exception("Cannot configure a non-scanner object!")
-    scanner.register_test(StsHeaderPresent())
-    scanner.register_test(XfoPresent())
-    scanner.register_test(RobotsTest())
-    scanner.register_test(StsUpgradeCheck())
-    scanner.register_test(HttpOnlyPresent())
-    scanner.register_test(SecureAttributePresent())
+    scanner.register_check(StsHeaderPresent())
+    scanner.register_check(XfoPresent())
+    scanner.register_check(RobotsTest())
+    scanner.register_check(StsUpgradeCheck())
+    scanner.register_check(HttpOnlyPresent())
+    scanner.register_check(SecureAttributePresent())
