@@ -1,10 +1,7 @@
 
 
 class Reporter():
-    
     reporters = {}
-    
-    # todo - implement me!
     def start_report(self):
         return None
     
@@ -39,9 +36,9 @@ class Reporter():
         return "This reporter is unimplemented!"
         
 class DetailReporter(Reporter):
-    # TODO Implement me.
+    # TODO Implement detailed reporter
     def end_report(self):
-        return "This reporter should emit an XML report that includes all of the the details for each test. including captured data"
+        return "This reporter should emit an XML report that includes all of the the details for each test, including captured data"
     
 Reporter.reporters['detail'] = DetailReporter()
         

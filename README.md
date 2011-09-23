@@ -1,23 +1,20 @@
 # Garmr
 
-Garmr is a checking that a site meets the basic requirements from a security point of view. 
-It checks what the correct HTTP calls are allowed and others are blocked. It is installable from PyPi.
+Garmr is a tool to inspect the responses from websites for basic security requirements.
+
+Garmr includes a set of core test cases implemented in corechecks that are derived from
+the Secure Coding Guidelines that can be found at [https://wiki.mozilla.org/WebAppSec/Secure_Coding_Guidelines]
 
 ## Installation
 
-This version of garmr :
-
-* does not support pip.  grab the source from git
+This version of Garmr :
+* does not support pip.  Grab the source from git
 * requires Requests > 0.6.2-dev, which can be installed by following the instructions here:
 ** http://docs.python-requests.org/en/latest/user/install/#get-the-code
-
-
 
 ## Usage
 
 usage: garmr.py [-h] [-u TARGETS] [-m MODULES] [-f TARGET_FILES] [-p] [-d]
-
-Check urls for compliance with Secure Coding Guidelines
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -31,7 +28,6 @@ optional arguments:
   -d, --dns             Skip DNS resolution when registering a target.
 
 ## Tasks
-
-* Implement a way to provide supply parameters and specify which http verb to use
-* Implement sequences (i.e. a set of ActiveTests that once invoked, maintains a cookie jar)
-* Implement a proper reporter; currently a range of data is accumulated, but never reported.
+* Implement sequences (i.e. a series of ActiveTests that once invoked, maintains a cookie jar until the list of URLs is exhausted)
+* Implement a proper detailed reporter; currently a range of data is accumulated, but never reported.
+* Implement more checks
