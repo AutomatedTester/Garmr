@@ -1,0 +1,29 @@
+[Garmr]
+force-passives = False
+module = corechecks, djangochecks
+reporter = reporter.AntXmlReporter
+output = garmr-results.xml
+dns = True
+
+[corechecks.StsUpgradeCheck]
+enabled = True
+
+[djangochecks.AdminAvailable]
+enabled = True
+path = console
+
+[corechecks.RobotsTest]
+enabled = True
+
+[corechecks.StsHeaderPresent]
+enabled = True
+
+[corechecks.SecureAttributePresent]
+enabled = True
+
+[corechecks.HttpOnlyPresent]
+enabled = True
+
+[corechecks.XfoPresent]
+enabled = True
+
