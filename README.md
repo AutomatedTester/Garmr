@@ -1,3 +1,7 @@
+# I NO LONG MAINTAIN THIS. Please follow [Yvan's Fork](https://github.com/ygjb/Garmr)
+
+
+
 # Garmr
 
 Garmr is a checking that a site meets the basic requirements from a security point of view. 
