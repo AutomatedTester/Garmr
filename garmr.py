@@ -1,224 +1,96 @@
-#!/usr/bin/python
-
-import httplib
-import urllib2
-from optparse import OptionParser
-import logging
-from datetime import datetime
-
-
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s')
-logger = logging.getLogger("Garmr")
-logger.setLevel(logging.DEBUG)
-
-class Reporter(object):
-    """
-        This class formats and writes a xUnit style report on the results from
-        the basic tests
-    """
-    
-
-    suite_xml="""<?xml version="1.0" encoding="utf-8"?>
-        <testsuite name="Garmr" errors="{error}" failures="{failure}" 
-            skips="{skips}" tests="{numtests}" time="{timetaken}">
-            {testresults}
-        </testsuite>"""
-
-    def __init__(self, results=None):
-        """
-            Initializes the reporter class
-            Args:
-                results - optional parameter to take the results. If results 
-                        are not passed in here they need to be passed in
-                        write_results method or an exception will be raised
-        """
-        logging.debug("Reporter class initialized")
-        self.results = results
-
-    def write_results(self, file_name='garmr-results.xml', results=None):
-        """
-            This writes the xml to disk.
-            Args:
-                file_name - optional parameter of the name of the file to create
-                results - optional parameter of with the test results. If this is
-                        empty and nothing was passed in during object initialization
-                        an error will be raised. 
-                        Note: if you pass in above and here the latest results will 
-                        be used
-
-        """
-        if self.results is None and results is None:
-            logging.exception("No test results have been passed Reporter")
-            raise Exception("No results have been passed. Please pass in a result")
-
-        if results is not None:
-            self.results = results
-
-        formatted = self._format_results()
-        suite_results = self.suite_xml.format(error=formatted["errors"], 
-                                        failure=formatted["failed"],
-                                        skips=formatted["skips"],
-                                        numtests=formatted["tests"], 
-                                        timetaken=formatted["time_taken"], 
-                                        testresults=formatted["testcase"])
-        file_results = open(file_name, "w")
-        file_results.write(suite_results)
-        file_results.close()
-
-
-    def _format_results(self):
-        testcase = """<testcase classname="" name="{testname}" time="{timetaken}" """
-        errs = '><{errtype}>{message}</{errtype}></testcase>'
-        formatted_results = ""
-        results = {"time_taken":0,
-                    "errors" : 0,
-                    "failed" : 0,
-                    "skips" : 0,
-                    "tests" : 0}
-        
-        for res in self.results:
-            results["tests"] += 1
-            formatted_results +=  testcase.format(
-                    testname = res["name"],timetaken=res["time_taken"])
-            if res.has_key("errors"):
-                results["errors"] += 1
-                formatted_results +=  errs.format(errtype="error", message=res["message"])
-            elif res.has_key("failed"):
-                results["failed"] += 1
-                formatted_results += errs.format(errtype="failure", message=res["message"])
-            elif res.has_key("skips"):
-                results["skips"] += 1
-                formatted_results += errs.format(errtype="skipped", message=res["message"])
-            else:
-                formatted_results += "/>"
-            results["time_taken"] += res["time_taken"]
-        
-        results["testcase"] = formatted_results
-        return results
-
-class Garmr(object):
-
-
-    def __init__(self, urls):
-        self.urls = urls
-
-    def xframe_checks(self):
-        result = {}
-        result["name"] = self.xframe_checks.__name__
-        start = datetime.now()
-        try:
-            response = urllib2.urlopen(self.urls) 
-            response_headers = response.headers.headers
-            headers = self._clean_header(response_headers)
-            logger.info("Checking x-frame-options")
-            try:
-                assert headers["x-frame-options"] == "DENY" or \
-            	    headers["x-frame-options"] == "SAMEORIGIN", \
-                	"x-frame-options were: %s" % headers["x-frame-options"]
-
-                logger.info("x-frame-options were correct")
-            except KeyError:
-                message = "x-frame-options were not found in headers"
-                result["failed"] = True
-                result["message"] = message
-                logger.critical(message)
-        except AssertionError as e:
-            logger.error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = self._total_seconds(start, finish)
-        logger.debug("Time Taken: %s:" % result["time_taken"])
-        return result
-        
-    def trace_checks(self):
-        result = {}
-        result["name"] = self.trace_checks.__name__
-        start = datetime.now()
-    	try:
-            logger.info("Checking TRACE is not valid")
-            http_urls = self._clean_url(self.urls) 
-            request = httplib.HTTPConnection(http_urls[0])
-            if len(http_urls) > 1:
-                request.request("TRACE", http_urls[1])
-            else:
-                request.request("TRACE", "/")
-                
-            request.getresponse()
-            raise Exception("TRACE is a valid HTTP call")
-        except httplib.BadStatusLine, e:
-            logger.info("TRACE is not valid")
-        except Exception, e:
-            logger.error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = self._total_seconds(start, finish)
-        logger.debug("Time Taken: %s:" % result["time_taken"])
-        return result
-
-
-    def redirect_checks(self):
-        result = {}
-        result["name"] = self.redirect_checks.__name__
-        start = datetime.now()
-        response = urllib2.urlopen(self.urls)
-        try:
-            logger.info("Checking for HTTPS")
-            assert "https://" in response.geturl(), "Have not been redirected to HTTPS"
-            logger.info("Redirected to HTTPS version of site")
-        except AssertionError, e:
-            logger.error(str(e))
-            result["errors"] = True
-            result["message"] = str(e)
-        finish = datetime.now()
-        result["time_taken"] = self._total_seconds(start, finish)
-        logger.debug("Time Taken: %s:" % result["time_taken"])
-        return result
-
-    def _clean_header(self, response_headers):
-    	headers = {}
-    	for head in response_headers:
-        	lst = head.strip(" \r\n").split(":")
-	        headers[lst[0]] = lst[1].strip()
-    	return headers
-
-    def _clean_url(self, urls):
-        import re
-        mtch = re.search("https?://([^/]*?)(/.*)?", urls)
-        split = []
-        for matches in mtch.groups():
-            split.append(matches)
-        return split
-
-    def _total_seconds(self, start, finish):
-        td = finish - start
-        return float((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6)) / 10**6
+import argparse
+from scanner import ActiveTest, PassiveTest, Scanner
+import corechecks
+from reporter import Reporter
+import sys
+import traceback
 
 def main():
-    usage = "Usage: %prog [option] arg"
-    parser = OptionParser(usage=usage, version="%prog 0.2")
-    parser.add_option("-u", "--url", action="store", type="string",
-                    dest="aut", help="Url to be tested")
-    parser.add_option("-f", "--file", action="store", type="string",
-                    dest="file_name", 
-                    help="File name with URLS to test, Currently not available")
-    parser.add_option("-x", "--xunit", action="store", type="string",
-                    dest="xunit", default='garmr-results.xml',
-                    help="Name of file that you wish to write to")
+    parser = argparse.ArgumentParser("Runs a set of tests against the set of provided URLs")
+    parser.add_argument("-u", "--url", action="append", dest="targets", help="Add a target to test")
+    parser.add_argument("-f", "--target-file", action="append", dest="target_files", help="File with URLs to test")
 
-    (options, args) = parser.parse_args()
-    if options.aut is None and options.file_name is None:
-        parser.error("Please supply an argument")
-
-    test_results = []
-
-    garmr = Garmr(options.aut)
-    test_results.append(garmr.trace_checks())
-    test_results.append(garmr.xframe_checks())
-    test_results.append(garmr.redirect_checks())
-    reporter = Reporter(test_results)
-    reporter.write_results(file_name=options.xunit)
-
+    parser.add_argument("-m", "--module", action="append", default = ["corechecks"], dest="modules", help="Load an extension module")
+    parser.add_argument("-p", "--force-passive", action="store_true", default=False, dest="force_passives", help ="Force passives to be run for each active test")
+    parser.add_argument("-d", "--dns", action="store_false", default=True, dest="resolve_target", help ="Skip DNS resolution when registering a target")
+    parser.add_argument("-r", "--report", action="store", default="reporter.AntXmlReporter", dest="report",help="Load a reporter e.g. -r reporter.AntXmlReporter")
+    parser.add_argument("-o", "--output", action="store", default="garmr-results.xml", dest="output", help="Default output is garmr-results.xml")
+    parser.add_argument("-c", "--check", action="append", dest="opts", help="Set a parameter for a check (check:opt=value)" )
+    parser.add_argument("-e", "--exclude", action="append", dest="exclusions", help="Prevent a check from being run/processed")
+    parser.add_argument("--save", action="store", dest="dump_path", help="Write out a configuration file based on parameters (won't run scan)")
+    
+    args = parser.parse_args()
+    scanner = Scanner()
+    
+    scanner.force_passives = args.force_passives
+    scanner.resolve_target = args.resolve_target
+    scanner.output = args.output
+     
+    # Start building target list.
+    if args.targets != None:
+        for target in args.targets:
+            scanner.register_target(target)
+        
+    # Add targets from files to the list.
+    if args.target_files != None:
+        for targets in args.target_files:
+            try:
+                f = open(targets, "r")
+                for target in f:
+                    t = target.strip()
+                    if len(t) > 0:
+                        scanner.register_target(t)
+            except:
+                Scanner.logger.error("Unable to process the target list in: %s", targets)
+    
+    # Configure modules.
+    # TODO: change the module loading to scan the list of classes in a module and automagically 
+    #       detect any tests defined.
+    if args.modules != None:
+        for module in args.modules:
+            try:
+                __import__(module)
+                m = sys.modules[module]
+                m.configure(scanner)
+            except Exception, e:
+                Scanner.logger.fatal("Unable to load the requested module [%s]: %s", module, e)
+                quit()
+                
+    # Set up the reporter (allow it to load from modules that are configured)
+    try:
+        reporter = args.report.split('.')
+        if len(reporter) == 1:
+            scanner.reporter = Reporter.reporters[reporter[0]]
+        else:
+            scanner.reporter = getattr(sys.modules[reporter[0]], reporter[1])()
+            Scanner.logger.info("Writing report to [%s] using [%s]" % (args.output, args.report))
+        if isinstance(scanner.reporter, Reporter) == False:
+            raise Exception("Cannot configure a non-scanner object!")
+    except Exception, e:
+        Scanner.logger.fatal("Unable to use the reporter class [%s]: %s", args.report, e)
+        quit()
+        
+    # Disable excluded checks.
+    if args.exclusions != None:
+        for exclude in args.exclusions:
+            scanner.disable_check(exclude)
+    
+    # Configure checks
+    if args.opts != None:
+        for opt in args.opts:
+            try:
+                check = opt.split(":")[0]
+                key, value = opt[len(check)+1:].split("=")
+                scanner.configure_check(check, key, value)
+            except Exception, e:
+                Scanner.logger.fatal("Invalid check option: %s (%s)", opt, e)
+                
+    if args.dump_path != None:
+        scanner.save_configuration(args.dump_path)
+        return
+    
+    scanner.run_scan()
+    
+    
 if __name__ == "__main__":
     main()

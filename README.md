@@ -4,29 +4,34 @@
 
 # Garmr
 
-Garmr is a checking that a site meets the basic requirements from a security point of view. 
-It checks what the correct HTTP calls are allowed and others are blocked. It is installable from PyPi.
+Garmr is a tool to inspect the responses from websites for basic security requirements.
+
+Garmr includes a set of core test cases implemented in corechecks that are derived from
+the Secure Coding Guidelines that can be found at [https://wiki.mozilla.org/WebAppSec/Secure_Coding_Guidelines]
 
 ## Installation
 
-To install it is a simple case of 
-  sudo pip install garmr
+This version of Garmr :
+* does not support pip.  Grab the source from git
+* requires Requests > 0.6.2-dev, which can be installed by following the instructions here:
+** http://docs.python-requests.org/en/latest/user/install/#get-the-code
 
 ## Usage
 
-garmr -u http://application.under.test/path
+usage: garmr.py [-h] [-u TARGETS] [-m MODULES] [-f TARGET_FILES] [-p] [-d]
 
-This will create a file called garmr-results.xml which will have the results of the 
-tests stored in it.
-
-### Options
-
-* "-u", "--url": Url to be tested 
-* "-f", "--file": File name with URLS to test, Currently not available 
-* "-x", "--xunit": Name of file that you wish to write to. Defaults to garmr-results.xml
-
+optional arguments:
+  -h, --help            show this help message and exit
+  -u TARGETS, --url TARGETS
+                        add a target to test
+  -m MODULES, --module MODULES
+                        load a test suite
+  -f TARGET_FILES, --file TARGET_FILES
+                        File with urls to test
+  -p, --force-passive   Force passives to be run for each active test
+  -d, --dns             Skip DNS resolution when registering a target.
 
 ## Tasks
-
-If you want to see what is currently being worked on you can see it on the 
-[Pivotal Tracker](https://www.pivotaltracker.com/projects/285905)
+* Implement sequences (i.e. a series of ActiveTests that once invoked, maintains a cookie jar until the list of URLs is exhausted)
+* Implement a proper detailed reporter; currently a range of data is accumulated, but never reported.
+* Implement more checks

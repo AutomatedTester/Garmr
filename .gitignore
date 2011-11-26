@@ -3,3 +3,9 @@ dist/
 *.egg-info/
 *.pyc
 garmr-results.xml
+
+.project
+
+.pydevproject
+
+targets.txt
